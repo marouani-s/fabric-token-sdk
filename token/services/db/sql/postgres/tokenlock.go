@@ -34,14 +34,16 @@ func (db *TokenLockDB) Cleanup(leaseExpiry time.Duration) error {
 		db.Logger.Warnf("Could not log stale locks: %v", err)
 	}
 	query := fmt.Sprintf(
-		"DELETE FROM %s "+
-			"USING %s WHERE %s.consumer_tx_id = %s.tx_id AND (%s.status IN (%d) "+
-			"OR %s.created_at < NOW() - INTERVAL '%d seconds'"+
-			");",
+		"DELETE FROM %s"+
+			" WHERE "+
+			"%s.created_at < NOW() - INTERVAL '%d seconds'"+
+			" OR "+
+			"EXISTS (SELECT 1 FROM %s WHERE %s.tx_id = %s.consumer_tx_id AND %s.status IN (%d));",
 		db.Table.TokenLocks,
-		db.Table.Requests, db.Table.TokenLocks, db.Table.Requests, db.Table.Requests, driver.Deleted,
 		db.Table.TokenLocks, int(leaseExpiry.Seconds()),
+		db.Table.Requests, db.Table.Requests, db.Table.TokenLocks, db.Table.Requests, driver.Deleted,
 	)
+
 	db.Logger.Debug(query)
 	_, err := db.WriteDB.Exec(query)
 	if err != nil {
